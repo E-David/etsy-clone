@@ -15,31 +15,41 @@ var EtsyCollection = Backbone.Collection.extend({
 
 var EtsyModel = Backbone.Model.extend({
 	url: function() {
-		return "https://openapi.etsy.com/v2/shops/listing/" + 
-			this._listingId + '/active.js'
+		return "https://openapi.etsy.com/v2/listings/" + 
+			this._listingId + '.js'
 	},
-	_listingId: ""
+	_listingId: "",
+	_shopId: "",
+	parse: function(rawData){
+		var parsedData = rawData.results[0]
+		return parsedData
+	}
 })
 
 //VIEW
 var ListView = Backbone.View.extend({
-	el: qs(".items-container"),
+	el: qs(".listings-container"),
 	_render: function(){
 		var items = this.collection.models
 		var htmlString = ""
 
-		htmlString += ""
-		for(var i = 0; i < items.length; i++){
-			var itemModel = items[i]
-			console.log(itemModel)
-			htmlString += "<div class='details-container"
-			htmlString += 	"<p>" + itemModel.get("description") + "</p>"
-			// htmlString += 	"<a href='#detail/'>Hello"
-			// htmlString += 	"<h3>" + headline + "</h3>"
-			// htmlString += 	"</a>"
-			htmlString += "</div>"
-		}
+		if(items.length !== 0) {
+			htmlString += "<div class='items-container'>"
+			for(var i = 0; i < items.length; i++){
+				var itemModel = items[i],
+					listingId = itemModel.get("listing_id"),
+					listingImage = itemModel.get("Images")[0].url_170x135
 
+				htmlString += "<div class='details-container'>"
+				htmlString += 	"<a href='#details/" + listingId +"'>"
+				htmlString += 		"<img src='" + listingImage + "'>"	
+				htmlString += 	"</a>"
+				htmlString += "</div>"
+			}
+			htmlString += "</div>"
+		} else {
+			htmlString += "<p>There doesn't seem to be anything here.</p>"
+		}
 		this.el.innerHTML = htmlString
 
 	},
@@ -49,13 +59,13 @@ var ListView = Backbone.View.extend({
 })
 
 var DetailsView = Backbone.View.extend({
-	el: document.querySelector(".items-container"),
+	el: qs(".listings-container"),
 	_render: function(){
-		var etsyModel = this.model
-		console.log(this)
-		var htmlString = ""
-		console.log(etsyModel)
-		htmlString += "<p>" + etsyModel + "</p>"
+		var etsyModel = this.model,
+			listingImage = etsyModel.get("Images")[0].url_170x135
+		var htmlString = "<div class='details-container listing'>"
+			htmlString += 	"<img src='" + listingImage + "'>"	
+			htmlString += "</div>"
 		this.el.innerHTML = htmlString
 	},
 	initialize: function(){
@@ -77,21 +87,27 @@ var doSearch = function(eventObject) {
 }
 searchBar.addEventListener("keydown", doSearch)
 
+var showGif = function() {
+	qs(".listings-container").innerHTML = "<img id='loading' src='./images/loading.gif'>"
+}
+
 //CONTROLLER
 
 var Controller = Backbone.Router.extend({
 	routes: {
 		"home": "handleHome",
 		"search/:query": "handleSearch",
-		"details/:id": "handleDetails",
+		"details/:listingId": "handleDetails",
 		"*default": "handleDefault"
 	},
 	handleHome: function() {
 		var etsyCollection = new EtsyCollection()
+		showGif()
 		etsyCollection.fetch({
 		    dataType: 'jsonp',
 		    data: {
-		    	"api_key": API_KEY
+		    	"api_key": API_KEY,
+		    	"includes": "Images,Shop"
 	    	}
 	    })
 
@@ -101,11 +117,13 @@ var Controller = Backbone.Router.extend({
 	},
 	handleSearch: function(query) {
 		var etsyCollection = new EtsyCollection()
+		showGif()
 		etsyCollection.fetch({
 		    dataType: 'jsonp',
 		    data: {
 		    	"api_key": API_KEY,
-		    	"tags": query
+		    	"tags": query,
+		    	"includes": "Images,Shop"
 	    	}
 	    })
 
@@ -117,10 +135,12 @@ var Controller = Backbone.Router.extend({
 		var etsyModel = new EtsyModel()
 		etsyModel._listingId = _listingId
 
+		showGif()
 		etsyModel.fetch({
 		    dataType: 'jsonp',
 		    data: {
-		    	"api_key": API_KEY
+		    	"api_key": API_KEY,
+		    	"includes": "Images,Shop"
 		    }
 	    })
 		console.log(etsyModel.url())
@@ -130,6 +150,7 @@ var Controller = Backbone.Router.extend({
 	},
 	handleDefault: function() {
 		location.hash = "home"
+		showGif()
 	},
 	initialize: function(){
 		Backbone.history.start()
